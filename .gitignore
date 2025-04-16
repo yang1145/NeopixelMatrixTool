@@ -1,0 +1,8 @@
+# 忽略 PyInstaller 生成的文件夹
+build/
+dist/
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
