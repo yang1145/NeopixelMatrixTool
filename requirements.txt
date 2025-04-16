@@ -1,0 +1,8 @@
+tkinter
+pygame
+pillow
+opencv-python
+argparse
+natsort
+numpy
+tqdm
