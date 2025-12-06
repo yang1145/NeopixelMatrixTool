@@ -8,10 +8,11 @@
 # ======================================== 导入相关模块 =========================================
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, colorchooser
 from ws_converter.converter import convert_image_to_json, convert_video_to_json
 from ws_converter.simulator import WS2812Simulator
 from ws_converter.editor import PixelEditor
+from ws_converter.char_converter import get_default_font, char_to_matrix
 import threading
 import os
 import json
@@ -28,7 +29,7 @@ import sys
 simulator = None
 sim_thread = None
 # 指向 assets 文件夹
-ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "NeopixelMatrixTool\\assets")
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
 # 在全局变量部分添加
 global editor_window
@@ -289,12 +290,15 @@ def gui_main():
         if path:
             json_path.set(path)
             try:
-                with open(path) as f:
+                # 新增 encoding="utf-8"，支持含中文的JSON
+                with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                 width2.set(data["width"])
                 height2.set(data["height"])
                 status2.set("已自动读取帧尺寸")
-            except:
+            except Exception as e:
+                # 新增打印错误，方便调试
+                print(f"解析JSON错误：{e}")
                 status2.set("❌ 无法解析JSON文件")
 
     def start_sim():
@@ -318,11 +322,13 @@ def gui_main():
 
         # 读取尺寸
         try:
-            with open(file) as f:
+            # 新增 encoding="utf-8"
+            with open(file, encoding="utf-8") as f:
                 data = json.load(f)
             width2.set(data["width"])
             height2.set(data["height"])
-        except:
+        except Exception as e:
+            print(f"读取帧尺寸错误：{e}")
             status2.set("❌ 无法读取帧尺寸")
             return
 
@@ -508,6 +514,131 @@ def gui_main():
     tk.Button(ctrl_frame, text="⏮ 上一帧", command=prev_frame).grid(row=0, column=2, padx=5)
     tk.Button(ctrl_frame, text="⏭ 下一帧", command=next_frame).grid(row=0, column=3, padx=5)
     ctrl_frame.pack(pady=10)
+
+    # =================== Tab4：单字符转点阵 =====================
+    char_tab = ttk.Frame(tab_control)
+    tab_control.add(char_tab, text="单字符转点阵")
+
+    # -------------------------- 第一步：变量定义（所有变量集中在这里） --------------------------
+    input_char = tk.StringVar()
+    char_width = tk.IntVar(value=24)
+    char_height = tk.IntVar(value=16)
+    char_output_path = tk.StringVar()
+    char_status = tk.StringVar(value="准备就绪")
+    # 新增：文字色/背景色变量（默认白色字、黑色背景）
+    text_color = tk.StringVar(value="#ffffff")  # 文字色（十六进制）
+    bg_color = tk.StringVar(value="#000000")  # 背景色（十六进制）
+    # 提前定义颜色预览标签（解决“未定义”问题）
+    text_color_preview = None
+    bg_color_preview = None
+
+    # -------------------------- 第二步：颜色转换/选择函数（变量定义后，UI布局前） --------------------------
+    def hex_to_rgb(hex_str):
+        """十六进制颜色转RGB元组（如#ffffff → (255,255,255)）"""
+        hex_str = hex_str.lstrip('#')
+        return tuple(int(hex_str[i:i + 2], 16) for i in (0, 2, 4))
+
+    def choose_text_color():
+        """选择文字颜色"""
+        clr = colorchooser.askcolor(initialcolor=text_color.get(), parent=char_tab)
+        if clr[0]:
+            text_color.set(clr[1])  # 保存十六进制颜色
+            # 更新预览标签背景
+            text_color_preview.config(bg=clr[1])
+
+    def choose_bg_color():
+        """选择背景颜色"""
+        clr = colorchooser.askcolor(initialcolor=bg_color.get(), parent=char_tab)
+        if clr[0]:
+            bg_color.set(clr[1])  # 保存十六进制颜色
+            # 更新预览标签背景
+            bg_color_preview.config(bg=clr[1])
+
+    # -------------------------- 第三步：文件选择/转换函数（颜色函数后） --------------------------
+    def browse_char_output():
+        """选择字符JSON输出路径"""
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON文件", "*.json")],
+            title="保存字符点阵JSON"
+        )
+        if path:
+            char_output_path.set(path)
+
+    def do_char_convert():
+        """执行字符转点阵"""
+        try:
+            char = input_char.get().strip()
+            w = char_width.get()
+            h = char_height.get()
+            out_path = char_output_path.get()
+
+            if not char or not out_path:
+                char_status.set("❌ 请输入字符并选择输出路径")
+                return
+
+            # 转换颜色（十六进制→RGB元组）
+            text_rgb = hex_to_rgb(text_color.get())
+            bg_rgb = hex_to_rgb(bg_color.get())
+
+            # 调用核心转换逻辑（传入颜色参数）
+            from ws_converter.char_converter import char_to_matrix
+            char_to_matrix(
+                char, w, h,
+                output_path=out_path,
+                text_color=text_rgb,  # 自定义文字色
+                bg_color=bg_rgb  # 自定义背景色
+            )
+
+            char_status.set(f"✅ 字符「{char}」转换完成！已保存至{out_path}")
+        except ValueError as e:
+            char_status.set(f"❌ 错误：{e}")
+        except FileNotFoundError as e:
+            char_status.set(f"❌ 字体文件错误：{e}")
+        except Exception as e:
+            char_status.set(f"❌ 未知错误：{str(e)}")
+
+    # -------------------------- 第四步：UI布局（按顺序：字符输入 → 颜色选择 → 尺寸设置 → 输出路径 → 转换按钮 → 状态） --------------------------
+    # 1. 字符输入区域
+    tk.Label(char_tab, text="输入单个字符（中文/英文/数字）：", font=("微软雅黑", 12)).pack(anchor="w", padx=10,
+                                                                                         pady=(10, 0))
+    char_entry = tk.Entry(char_tab, textvariable=input_char, width=20, font=("微软雅黑", 14))
+    char_entry.pack(padx=10, pady=5)
+    tk.Label(char_tab, text="⚠ 仅支持单个字符，超出会自动截断", fg="red").pack(anchor="w", padx=10)
+
+    # 2. 颜色选择区域（★★★ 放在字符输入后、尺寸设置前 ★★★）
+    color_frame = tk.Frame(char_tab)
+    color_frame.pack(pady=10, padx=10, anchor="w")
+    # 文字色选择
+    tk.Label(color_frame, text="文字颜色：").grid(row=0, column=0, padx=5)
+    text_color_preview = tk.Label(color_frame, bg=text_color.get(), width=5)  # 初始化预览标签
+    text_color_preview.grid(row=0, column=1)
+    tk.Button(color_frame, text="选择", command=choose_text_color).grid(row=0, column=2, padx=5)
+    # 背景色选择
+    tk.Label(color_frame, text="背景颜色：").grid(row=0, column=3, padx=5)
+    bg_color_preview = tk.Label(color_frame, bg=bg_color.get(), width=5)  # 初始化预览标签
+    bg_color_preview.grid(row=0, column=4)
+    tk.Button(color_frame, text="选择", command=choose_bg_color).grid(row=0, column=5, padx=5)
+
+    # 3. 尺寸设置区域（原有代码）
+    char_param_frame = tk.Frame(char_tab)
+    char_param_frame.pack(pady=10, padx=10, anchor="w")
+    tk.Label(char_param_frame, text="点阵宽度：").grid(row=0, column=0, padx=5)
+    tk.Entry(char_param_frame, textvariable=char_width, width=5).grid(row=0, column=1)
+    tk.Label(char_param_frame, text="点阵高度：").grid(row=0, column=2, padx=5)
+    tk.Entry(char_param_frame, textvariable=char_height, width=5).grid(row=0, column=3)
+
+    # 4. 输出路径区域
+    tk.Label(char_tab, text="输出JSON路径：", font=("微软雅黑", 12)).pack(anchor="w", padx=10)
+    tk.Entry(char_tab, textvariable=char_output_path, width=70).pack(padx=10)
+    tk.Button(char_tab, text="选择保存路径", command=browse_char_output).pack(pady=5)
+
+    # 5. 转换按钮 + 状态提示
+    tk.Button(char_tab, text="生成点阵JSON", command=do_char_convert, bg="#007acc", fg="white", width=20).pack(pady=10)
+    tk.Label(char_tab, textvariable=char_status, fg="green", font=("微软雅黑", 11)).pack(pady=5)
+
+    # 6. 提示信息
+    tk.Label(char_tab, text="⚠ 建议尺寸：宽度≤256，高度≤128 | 仅支持单个字符", fg="red").pack(anchor="w", padx=10)
 
     tk.Label(play_tab, textvariable=status2, fg="blue").pack()
 

@@ -57,7 +57,8 @@ class WS2812Simulator:
         self.clear_frames()  # 加载前清空旧数据
         files = natsort.natsorted(glob.glob(json_pattern))
         for path in files:
-            with open(path) as f:
+            # 新增 encoding="utf-8"，解决中文JSON解码错误
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
                 pixels = [rgb565_to_rgb888(p) for p in data["pixels"]]
                 self.frames.append(pixels)
