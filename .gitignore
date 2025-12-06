@@ -1,6 +1,8 @@
 # 忽略 PyInstaller 生成的文件夹
 build/
 dist/
+out/
+output/
 
 __pycache__/
 *.pyc
