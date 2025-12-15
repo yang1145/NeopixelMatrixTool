@@ -4,6 +4,7 @@
 # @Author  : 李清水            
 # @File    : char_converter.py       
 # @Description : 单字符转WS2812点阵JSON文件
+# @License : MIT
 
 # ======================================== 导入相关模块 =========================================
 
@@ -17,8 +18,11 @@ from ws_converter.editor import rgb888_to_rgb565
 # ======================================== 功能函数 ============================================
 
 def get_default_font():
-    """获取默认中文字体（兼容Windows/Linux/Mac）"""
-    root_dir = os.path.dirname(os.path.dirname(__file__))  # ws_converter的上级是NeopixelMatrixTool
+    """
+    获取默认中文字体（兼容Windows/Linux/Mac）
+    """
+    # ws_converter的上级是NeopixelMatrixTool
+    root_dir = os.path.dirname(os.path.dirname(__file__))
     font_paths = [
         os.path.join(root_dir, "assets", "simhei.ttf"),
         "simhei.ttf",  # Windows备用
@@ -30,7 +34,6 @@ def get_default_font():
         if os.path.exists(path):
             return path
     raise FileNotFoundError("未找到中文字体文件，请将simhei.ttf放入NeopixelMatrixTool/assets目录")
-
 
 def char_to_matrix(char, width, height, font_size=None, output_path=None,
                    text_color=(255, 255, 255), bg_color=(0, 0, 0)):
@@ -76,7 +79,8 @@ def char_to_matrix(char, width, height, font_size=None, output_path=None,
 
     # 5. 严格二值化掩码（确保只有0/255两种值）
     threshold = 127
-    binary_mask = mask_img.point(lambda p: 255 if p > threshold else 0)  # 高于阈值=白，否则=黑
+    # 高于阈值=白，否则=黑
+    binary_mask = mask_img.point(lambda p: 255 if p > threshold else 0)
 
     # ===================== 第二步：替换为用户自定义颜色 =====================
     # 1. 初始化RGB画布（最终颜色画布）
@@ -87,7 +91,8 @@ def char_to_matrix(char, width, height, font_size=None, output_path=None,
     for y_pixel in range(height):
         for x_pixel in range(width):
             mask_pixel = binary_mask.getpixel((x_pixel, y_pixel))
-            if mask_pixel == 255:  # 掩码中白色=文字→替换为用户选的文字色
+            # 掩码中白色=文字→替换为用户选的文字色
+            if mask_pixel == 255:
                 final_img.putpixel((x_pixel, y_pixel), text_color)
             # 掩码中黑色=背景→保持初始化的背景色，无需操作
 
