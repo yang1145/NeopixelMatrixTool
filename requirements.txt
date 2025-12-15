@@ -1,5 +1,5 @@
 pygame
-Pillow
+pillow
 opencv-python
 natsort
 numpy
